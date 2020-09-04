@@ -1,0 +1,10 @@
+universe         = vanilla
+executable       = /home/rich.ormiston/refinery/condor/nonlinear_pipeline
+getenv           = True
+accounting_group = ligo.dev.o3.detchar.explore.test
+arguments        = $(chan1) $(chan2)
+log              = /home/rich.ormiston/refinery/condor/nonlinear_pipeline.log
+output           = /home/rich.ormiston/refinery/condor/out/nonlinear_pipeline.$(jobNumber).out
+error            = /home/rich.ormiston/refinery/condor/err/nonlinear_pipeline.$(jobNumber).error
+notification     = never
+queue 1

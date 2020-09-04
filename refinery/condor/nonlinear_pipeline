@@ -1,0 +1,142 @@
+#! /usr/bin/python3
+import numpy as np
+import scipy.linalg as sl
+import scipy.signal as sig
+import sys
+from gwpy.timeseries import TimeSeriesDict
+
+
+#-------------------------------------------------------------------------------
+#                           Function Definitions
+#-------------------------------------------------------------------------------
+def volterra_pipeline(d, wit1, wit2, M):
+    P = three_point_static_corr(d, wit1, wit2, M=M)
+    out = four_point_corr(wit1, wit2, wit1, wit2, M)
+    vc = out.reshape(((M+1)**2, (M+1)**2)).T
+    weights = sl.solve(vc, P)
+    est = apply_weights_2d(wit1, wit2, weights.reshape(((M+1), (M+1))))
+    clean = d - est
+    return clean
+
+
+def three_point_static_corr(a, b, c, M):
+    if a.size != b.size or b.size != c.size:
+        sys.exit('Array sizes do not match!')
+
+    # pad and stack (makes rolling cleaner)
+    a = np.pad(a, (M,M), mode='constant', constant_values=0)
+    b = np.pad(b, (M,M), mode='constant', constant_values=0)
+    c = np.pad(c, (M,M), mode='constant', constant_values=0)
+
+    # fill the correlation matrix
+    out = np.zeros((2*M+1, 2*M+1))
+    for i in range(-M,M+1):
+        for mp in range(-M,M+1):
+            out[mp, i] = np.sum(a * np.roll(b, mp)\
+                    * np.roll(c, i))
+
+    out = out[:M+1, :M+1].flatten()
+    return out
+
+
+def four_point_corr(a, b, c, d, M):
+    if a.size != b.size or b.size != c.size or c.size != d.size:
+        sys.exit('Array sizes do not match!')
+
+    # pad and stack (makes rolling cleaner)
+    a = np.pad(a, (M,M), mode='constant', constant_values=0)
+    b = np.pad(b, (M,M), mode='constant', constant_values=0)
+    c = np.pad(c, (M,M), mode='constant', constant_values=0)
+    d = np.pad(d, (M,M), mode='constant', constant_values=0)
+
+    # fill the correlation matrix
+    out = np.zeros((2*M+1,2*M+1, 2*M+1, 2*M+1))
+    for j in range(-M,M+1):
+        for i in range(-M,M+1):
+            for mp in range(-M,M+1):
+                for m in range(-M,M+1):
+                    out[m, mp, i, j] = np.sum(np.roll(a, m) * np.roll(b, mp)\
+                            * np.roll(c, i) * np.roll(d, j))
+
+    out = out[:M+1, :M+1, :M+1, :M+1]
+    return out
+
+
+def apply_weights_2d(wit1, wit2, a):
+    M = a.shape[0] - 1
+
+    wit1 = np.pad(wit1, (M, 0), mode='constant', constant_values=0)
+    wit2 = np.pad(wit2, (M, 0), mode='constant', constant_values=0)
+
+    y = np.zeros(wit1.size-M)
+    for ii in range(wit1.size-M):
+        wit_mat = np.outer(wit1[ii:ii + (M+1)][::-1], wit2[ii:ii+(M+1)][::-1])
+        y[ii] = np.tensordot(wit_mat, a)
+
+    return y
+
+
+def butter_filter(dataset,
+                 low   = 10.0,
+                 high  = 60.0,
+                 order = 8,
+                 btype = 'bandpass',
+                 fs    = 256):
+    # Normalize the frequencies
+    nyq  = 0.5 * fs
+    low  /= nyq
+    high /= nyq
+
+    # Make and apply filter
+    if 'high' in btype:
+        z, p, k = sig.butter(order, low, btype=btype, output='zpk')
+    elif 'band' in btype:
+        z, p, k = sig.butter(order, [low, high], btype=btype, output='zpk')
+    elif 'low' in btype:
+        z, p, k = sig.butter(order, high, btype=btype, output='zpk')
+    sos = sig.zpk2sos(z, p, k)
+
+    if dataset.ndim == 2:
+        for i in range(dataset.shape[0]):
+            dataset[i, :] = sig.sosfiltfilt(sos, dataset[i, :])
+    else:
+        dataset = sig.sosfiltfilt(sos, dataset)
+
+    return dataset
+
+
+#-------------------------------------------------------------------------------
+#                         Collect Data and Run Filter
+#-------------------------------------------------------------------------------
+ch1  = sys.argv[1]
+ch2  = sys.argv[2]
+# darm = 'L1:GDS-CALIB_STRAIN'
+darm = 'L1:DCS-CALIB_STRAIN_C01'
+st   = 1241683638  # March 12, 2019 08:07:00 UTC
+ifo  = 'L1'
+fs   = 256
+dur  = 1024
+M    = 1
+
+# collect the data
+data = TimeSeriesDict.fetch([darm, ch1, ch2], st, st+dur, allow_tape=True)
+data.resample(fs)
+keys = list(data.keys())
+darm = data[keys[0]].value
+wit1 = data[keys[1]].value
+wit2 = data[keys[2]].value
+darm = butter_filter(darm)
+
+# run the filter
+clean = volterra_pipeline(darm, wit1, wit2, M)
+
+#-------------------------------------------------------------------------------
+#                               Write the Results
+#-------------------------------------------------------------------------------
+f, darm_psd = sig.welch(darm, fs=fs, nperseg=fs*8)
+_, clean_psd = sig.welch(clean, fs=fs, nperseg=fs*8)
+ratio = clean_psd / darm_psd
+best_sub = np.min(ratio)
+N_sub_bins = len(np.where(ratio < .9)[0])
+with open('/home/rich.ormiston/refinery/condor/nonlinear_pipeline_results.txt', 'a') as f:
+    f.write('{0} {1} {2:.6f} {3}\n'.format(ch1, ch2, best_sub, N_sub_bins))
