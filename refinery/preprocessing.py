@@ -3,12 +3,7 @@ import scipy.signal as sig
 import nds2
 
 
-def butter_filter(dataset,
-                 low   = 4.0,
-                 high  = 20.0,
-                 order = 8,
-                 btype = 'bandpass',
-                 fs    = 512):
+def butter_filter(dataset, low=4.0, high=20.0, order=8, btype="bandpass", fs=512):
     """
     Phase preserving filter (bandpass, lowpass or highpass)
     based on a butterworth filter
@@ -35,17 +30,17 @@ def butter_filter(dataset,
     """
 
     # Normalize the frequencies
-    nyq  = 0.5 * fs
-    low  /= nyq
+    nyq = 0.5 * fs
+    low /= nyq
     high /= nyq
 
     # Make and apply filter
-    if 'high' in btype:
-        z, p, k = sig.butter(order, low, btype=btype, output='zpk')
-    elif 'band' in btype:
-        z, p, k = sig.butter(order, [low, high], btype=btype, output='zpk')
-    elif 'low' in btype:
-        z, p, k = sig.butter(order, high, btype=btype, output='zpk')
+    if "high" in btype:
+        z, p, k = sig.butter(order, low, btype=btype, output="zpk")
+    elif "band" in btype:
+        z, p, k = sig.butter(order, [low, high], btype=btype, output="zpk")
+    elif "low" in btype:
+        z, p, k = sig.butter(order, high, btype=btype, output="zpk")
     sos = sig.zpk2sos(z, p, k)
 
     if dataset.ndim == 2:
@@ -57,10 +52,7 @@ def butter_filter(dataset,
     return dataset
 
 
-def stream_data(start, channels,
-                dur  = 600,
-                fsup = 512,
-                ifo  = 'H1'):
+def stream_data(start, channels, dur=600, fsup=512, ifo="H1"):
     """
     Collect LIGO data using nds2
 
@@ -83,11 +75,10 @@ def stream_data(start, channels,
         array of collected data
     """
 
-    import nds2
-    if ifo == 'H1':
-        server = 'nds.ligo-wa.caltech.edu'
+    if ifo == "H1":
+        server = "nds.ligo-wa.caltech.edu"
     else:
-        server = 'nds.ligo-la.caltech.edu'
+        server = "nds.ligo-la.caltech.edu"
 
     # Setup connection to the NDS
     conn = nds2.connection(server, 31200)
@@ -102,13 +93,17 @@ def stream_data(start, channels,
         fsdown = data[k][0].channel.sample_rate
         down_factor = int(fsdown // fsup)
 
-        fir_aa = sig.firwin(20 * down_factor + 1, 0.8 / down_factor,
-                            window='blackmanharris')
+        fir_aa = sig.firwin(
+            20 * down_factor + 1, 0.8 / down_factor, window="blackmanharris"
+        )
 
         # Using fir_aa[1:-1] cuts off a leading and trailing zero
-        downdata = sig.decimate(data[k][0].data, down_factor,
-                                ftype = sig.dlti(fir_aa[1:-1], 1.0),
-                                zero_phase = True)
+        downdata = sig.decimate(
+            data[k][0].data,
+            down_factor,
+            ftype=sig.dlti(fir_aa[1:-1], 1.0),
+            zero_phase=True,
+        )
         vdata.append(downdata)
 
     return np.array(vdata)
@@ -137,18 +132,18 @@ def whiten(data, fid_dat, time=60, fs=512):
     """
 
     # get the data we want (dat)
-    dat = data[:fid_dat.size]
+    dat = data[: fid_dat.size]
 
     # get the FFT and PSD (offset the windows so we can dewhiten later)
     win = np.hanning(len(dat))
     win[0] += 1e-6
     win[-1] += 1e-6
     wf = np.mean(win**2)
-    dfft = np.fft.rfft(dat*win) / np.sqrt(wf)
+    dfft = np.fft.rfft(dat * win) / np.sqrt(wf)
     _, dpsd = sig.welch(fid_dat, fs=fs, nperseg=len(fid_dat))
 
     # whiten FFT with the ASD and normalize by 1/fs
-    norm = 1/(fs)
+    norm = 1 / (fs)
     whitened = norm * (dfft / np.sqrt(dpsd))
     white_dat = np.fft.irfft(whitened, n=len(dat))
 
@@ -180,7 +175,7 @@ def dewhiten(white_dat, fid_dat, time, fs):
     n = time * fs
     whitened = np.fft.rfft(white_dat, n=n)
 
-    norm = 1/fs
+    norm = 1 / fs
     _, dpsd = sig.welch(fid_dat, fs=fs, nperseg=len(fid_dat))
     dfft = whitened * np.sqrt(dpsd) / norm
 
@@ -201,12 +196,12 @@ def whiten_zpk(signal, fs, flow=0.3, fhigh=30, order=6):
     else:
         axis = -1
 
-    zc = [-2*np.pi*flow]*(order//2)
-    pc = [-2*np.pi*fhigh]*(order//2)
+    zc = [-2 * np.pi * flow] * (order // 2)
+    pc = [-2 * np.pi * fhigh] * (order // 2)
     kc = 1.0
 
     sysc = sig.ZerosPolesGain(zc, pc, kc)
-    sysd = sysc.to_discrete(dt=1/float(fs), method='bilinear')
+    sysd = sysc.to_discrete(dt=1 / float(fs), method="bilinear")
 
     sosW = sig.zpk2sos(sysd.zeros, sysd.poles, sysd.gain)
     signal = sig.sosfiltfilt(sosW, signal, axis=axis)
@@ -230,7 +225,7 @@ def read_chans(chan_file):
     """
     with open(chan_file) as f:
         lines = f.readlines()
-    chans = [x.strip('\n') for x in lines]
+    chans = [x.strip("\n") for x in lines]
     return chans
 
 
@@ -258,19 +253,19 @@ def prepare_multi_wit(*pargs, M=1, lstm=False):
         output data array with M-taps of lookback
     """
     if M == 0:
-        print('WARNING: tried to set 0-dimensional channel')
-        print('Reverting to M=1')
+        print("WARNING: tried to set 0-dimensional channel")
+        print("Reverting to M=1")
         M = 1
 
     if M >= pargs[0].shape[1]:
-        print('WARNING: desired channel taps exceeds witness size')
-        print('Falling back to M={}'.format(pargs[0].shape[1] - 1))
+        print("WARNING: desired channel taps exceeds witness size")
+        print("Falling back to M={}".format(pargs[0].shape[1] - 1))
         M = pargs[0].shape[1] - 1
 
     wit_input = np.vstack((pargs))
     output = np.zeros((wit_input.shape[1] - (M - 1), M, wit_input.shape[0]))
     for r in range(output.shape[0]):
-        output[r, :, :] = wit_input[:, r:r+M].T
+        output[r, :, :] = wit_input[:, r : r + M].T
 
     # flatten for dense network
     if not lstm:

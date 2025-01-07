@@ -28,9 +28,9 @@ def volterra_pipeline(d, wit1, wit2, M):
     """
     P = three_point_static_corr(d, wit1, wit2, M=M)
     out = four_point_corr(wit1, wit2, wit1, wit2, M)
-    vc = out.reshape(((M+1)**2, (M+1)**2)).T
+    vc = out.reshape(((M + 1) ** 2, (M + 1) ** 2)).T
     weights = np.linalg.pinv(vc).dot(P)
-    est = apply_weights_2d(wit1, wit2, weights.reshape(((M+1), (M+1))))
+    est = apply_weights_2d(wit1, wit2, weights.reshape(((M + 1), (M + 1))))
     clean = d - est
     return clean
 
@@ -65,21 +65,20 @@ def three_point_static_corr(a, b, c, M):
     """
 
     if a.size != b.size or b.size != c.size:
-        sys.exit('Array sizes do not match!')
+        sys.exit("Array sizes do not match!")
 
     # pad and stack (makes rolling cleaner)
-    a = np.pad(a, (M,M))
-    b = np.pad(b, (M,M))
-    c = np.pad(c, (M,M))
+    a = np.pad(a, (M, M))
+    b = np.pad(b, (M, M))
+    c = np.pad(c, (M, M))
 
     # fill the correlation matrix
-    out = np.zeros((2*M+1, 2*M+1))
-    for i in range(-M,M+1):
-        for mp in range(-M,M+1):
-            out[mp, i] = np.sum(a * np.roll(b, mp)\
-                    * np.roll(c, i))
+    out = np.zeros((2 * M + 1, 2 * M + 1))
+    for i in range(-M, M + 1):
+        for mp in range(-M, M + 1):
+            out[mp, i] = np.sum(a * np.roll(b, mp) * np.roll(c, i))
 
-    out = out[:M+1, :M+1].flatten()
+    out = out[: M + 1, : M + 1].flatten()
     return out
 
 
@@ -119,24 +118,25 @@ def four_point_corr(a, b, c, d, M):
     """
 
     if a.size != b.size or b.size != c.size or c.size != d.size:
-        sys.exit('Array sizes do not match!')
+        sys.exit("Array sizes do not match!")
 
     # pad and stack (makes rolling cleaner)
-    a = np.pad(a, (M,M))
-    b = np.pad(b, (M,M))
-    c = np.pad(c, (M,M))
-    d = np.pad(d, (M,M))
+    a = np.pad(a, (M, M))
+    b = np.pad(b, (M, M))
+    c = np.pad(c, (M, M))
+    d = np.pad(d, (M, M))
 
     # fill the correlation matrix
-    out = np.zeros((2*M+1,2*M+1, 2*M+1, 2*M+1))
-    for j in range(-M,M+1):
-        for i in range(-M,M+1):
-            for mp in range(-M,M+1):
-                for m in range(-M,M+1):
-                    out[m, mp, i, j] = np.sum(np.roll(a, m) * np.roll(b, mp)\
-                            * np.roll(c, i) * np.roll(d, j))
+    out = np.zeros((2 * M + 1, 2 * M + 1, 2 * M + 1, 2 * M + 1))
+    for j in range(-M, M + 1):
+        for i in range(-M, M + 1):
+            for mp in range(-M, M + 1):
+                for m in range(-M, M + 1):
+                    out[m, mp, i, j] = np.sum(
+                        np.roll(a, m) * np.roll(b, mp) * np.roll(c, i) * np.roll(d, j)
+                    )
 
-    out = out[:M+1, :M+1, :M+1, :M+1]
+    out = out[: M + 1, : M + 1, : M + 1, : M + 1]
     return out
 
 
@@ -150,9 +150,9 @@ def apply_weights_2d(wit1, wit2, a):
     wit1 = np.pad(wit1, (M, 0), constant_values=0)
     wit2 = np.pad(wit2, (M, 0), constant_values=0)
 
-    y = np.zeros(wit1.size-M)
-    for ii in range(wit1.size-M):
-        wit_mat = np.outer(wit1[ii:ii + (M+1)][::-1], wit2[ii:ii+(M+1)][::-1])
+    y = np.zeros(wit1.size - M)
+    for ii in range(wit1.size - M):
+        wit_mat = np.outer(wit1[ii : ii + (M + 1)][::-1], wit2[ii : ii + (M + 1)][::-1])
         y[ii] = np.tensordot(wit_mat, a)
 
     return y

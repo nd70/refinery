@@ -23,14 +23,14 @@ def rls(d, x, M=4, L=0.90):
     y : `numpy.ndarray`
         bilinear noise estimate
     """
-    inv_L = 1/L
-    w = np.random.rand(M+1)
-    P = np.eye(M+1)*0.01
+    inv_L = 1 / L
+    w = np.random.rand(M + 1)
+    P = np.eye(M + 1) * 0.01
     y = np.zeros_like(d)
     e = np.zeros_like(d)
 
-    for k in range(M+1, d.size):
-        xx = x[k-(M+1):k]
+    for k in range(M + 1, d.size):
+        xx = x[k - (M + 1) : k]
         y[k] = np.dot(w, xx)
         e[k] = d[k] - y[k]
         r = inv_L * np.dot(P, xx)
@@ -74,28 +74,28 @@ def nlms(d, x, M=1, mu=0.01, psi=0, leak=0):
 
     for ii in range(x.shape[0]):
         # initialize
-        w = np.random.rand(M+1)
+        w = np.random.rand(M + 1)
         e = np.zeros_like(d)
         y = np.zeros_like(d)
         xf = x[ii, :]
 
-        if mu == None:
+        if mu is None:
             eig = np.max(np.dot(xf, xf))
             mu = 1 / (4 * eig)
 
         # run the filter
-        for k in range(M+1, d.size):
-            xx = xf[k-(M+1):k]
+        for k in range(M + 1, d.size):
+            xx = xf[k - (M + 1) : k]
             y[k] = np.dot(w, xx)
             e[k] = d[k] - y[k]
-            w = w*(1-leak) + mu*e[k]*xx/(psi+np.dot(xx,xx))
+            w = w * (1 - leak) + mu * e[k] * xx / (psi + np.dot(xx, xx))
 
         estimate += y
 
     return estimate
 
 
-def soaf(d, x, M=1, mu=0.01, beta = 0.01):
+def soaf(d, x, M=1, mu=0.01, beta=0.01):
     """
     Self-orthogonalizing adaptive filter. Essentially,
     this is an LMS filter where the input signal is
@@ -121,18 +121,18 @@ def soaf(d, x, M=1, mu=0.01, beta = 0.01):
     """
     y = np.zeros_like(d)
     e = np.zeros_like(d)
-    w = np.random.rand(M+1)
+    w = np.random.rand(M + 1)
 
-    for k in range(M+1, d.size):
-        xx = x[k-(M+1):k]
+    for k in range(M + 1, d.size):
+        xx = x[k - (M + 1) : k]
         u = sc.dct(xx)
-        if k == M+1:
+        if k == M + 1:
             power = np.dot(u, u)
         y[k] = np.dot(w, u)
-        power = (1-beta)*power + beta * np.dot(u, u)
-        inv_sqrt_power = 1/(np.sqrt(power + 1e-5))
+        power = (1 - beta) * power + beta * np.dot(u, u)
+        inv_sqrt_power = 1 / (np.sqrt(power + 1e-5))
         e[k] = d[k] - y[k]
-        w = w + mu*e[k]*inv_sqrt_power * u
+        w = w + mu * e[k] * inv_sqrt_power * u
 
     return y
 
@@ -159,17 +159,18 @@ def bilinear_nlms(d, x1, x2, mu=1e-2, M=1, psi=1e-6):
     y : `numpy.ndarray`
         bilinear noise estimate
     """
-    a = np.random.rand(M+1, M+1)
+    a = np.random.rand(M + 1, M + 1)
     y = np.zeros(d.size)
     e = np.zeros(d.size)
 
     for ix in range(M, d.size):
-        xx1   = x1[ix-M:ix+1]
-        xx2   = x2[ix-M:ix+1]
+        xx1 = x1[ix - M : ix + 1]
+        xx2 = x2[ix - M : ix + 1]
         y[ix] = np.tensordot(a, np.outer(xx1, xx2))
         e[ix] = d[ix] - y[ix]
-        a = a + 2 * mu * e[ix] * np.outer(xx1, xx2) /\
-                ((xx1.dot(xx1) + xx2.dot(xx2))/1 + psi)
+        a = a + 2 * mu * e[ix] * np.outer(xx1, xx2) / (
+            (xx1.dot(xx1) + xx2.dot(xx2)) / 1 + psi
+        )
 
     return y, e
 
@@ -206,7 +207,7 @@ def adaptive_filter(data, mu=0.1, M=3, c_ops=None, shift=2, doShift=False):
 
     # filter one channel at a time (output is (pseudo)linear & nonstationary)
     for chan in range(wits.shape[0]):
-        if c_ops != None:
+        if c_ops is not None:
             mu, M = c_ops[chan + 1]
         xx = np.zeros(M)
 
@@ -215,7 +216,7 @@ def adaptive_filter(data, mu=0.1, M=3, c_ops=None, shift=2, doShift=False):
 
         # run the M-tap filter
         for k in range(M, N):
-            xx = wits[chan, k-M:k]
+            xx = wits[chan, k - M : k]
             est[chan, k] = np.dot(w, xx)
             e[chan, k] = tar[k] - est[chan, k]
             w = w + 2 * mu * e[chan, k] * xx
@@ -232,7 +233,7 @@ def adaptive_filter(data, mu=0.1, M=3, c_ops=None, shift=2, doShift=False):
     return combined_est
 
 
-def find_optimal_params(system_data, mu=[], M=[]):
+def find_optimal_params(system_data, mu=[], M=[], fs=128):
     """
     grid search to get the optimal number of taps and
     learning rate (using the adaptive_filter() function)
@@ -255,9 +256,8 @@ def find_optimal_params(system_data, mu=[], M=[]):
 
     """
     mse = np.inf
-    d = system_data[0, :]
     opt_mu, opt_M = 0.001, 3
-    _, df = sig.welch(system_data[0, :], fs=fs, nperseg=4*fs)
+    _, df = sig.welch(system_data[0, :], fs=fs, nperseg=4 * fs)
     c_ops = {}
 
     for c in range(1, system_data.shape[0]):
@@ -265,8 +265,8 @@ def find_optimal_params(system_data, mu=[], M=[]):
         for test_mu in mu:
             for test_M in M:
                 ce = adaptive_filter(data, mu=test_mu, M=test_M)
-                _, fres = sig.welch(data[0, :]-ce, fs=fs, nperseg=4*fs)
-                loop_res = np.sum(fres/df)
+                _, fres = sig.welch(data[0, :] - ce, fs=fs, nperseg=4 * fs)
+                loop_res = np.sum(fres / df)
                 if loop_res < mse:
                     opt_mu, opt_M = test_mu, test_M
                     mse = loop_res
@@ -297,7 +297,7 @@ def align_phase(tar, est, shift=2):
     """
 
     phase_shift = 0
-    for s in np.linspace(-shift, shift, shift*2 + 1, dtype=int):
+    for s in np.linspace(-shift, shift, shift * 2 + 1, dtype=int):
         if s > 0:
             s_mse = np.sum(np.square(tar[s:] - est[:-s])) / len(tar[s:])
         if s < 0:

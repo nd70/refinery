@@ -8,12 +8,7 @@ import nds2
 import sys
 
 
-def butter_filter(dataset,
-                 low   = 4.0,
-                 high  = 20.0,
-                 order = 8,
-                 btype = 'bandpass',
-                 fs    = 512):
+def butter_filter(dataset, low=4.0, high=20.0, order=8, btype="bandpass", fs=512):
     """
     Phase preserving filter (bandpass, lowpass or highpass)
     based on a butterworth filter
@@ -40,17 +35,17 @@ def butter_filter(dataset,
     """
 
     # Normalize the frequencies
-    nyq  = 0.5 * fs
-    low  /= nyq
+    nyq = 0.5 * fs
+    low /= nyq
     high /= nyq
 
     # Make and apply filter
-    if 'high' in btype:
-        z, p, k = sig.butter(order, low, btype=btype, output='zpk')
-    elif 'band' in btype:
-        z, p, k = sig.butter(order, [low, high], btype=btype, output='zpk')
-    elif 'low' in btype:
-        z, p, k = sig.butter(order, high, btype=btype, output='zpk')
+    if "high" in btype:
+        z, p, k = sig.butter(order, low, btype=btype, output="zpk")
+    elif "band" in btype:
+        z, p, k = sig.butter(order, [low, high], btype=btype, output="zpk")
+    elif "low" in btype:
+        z, p, k = sig.butter(order, high, btype=btype, output="zpk")
     sos = sig.zpk2sos(z, p, k)
 
     if dataset.ndim == 2:
@@ -88,25 +83,27 @@ def xcorr(x, y, maxlag=None):
     xl = x.size
     yl = y.size
     if xl != yl:
-        raise ValueError('x and y must be equal length')
+        raise ValueError("x and y must be equal length")
 
     if maxlag is None:
         maxlag = xl - 1
     else:
         maxlag = int(maxlag)
     if maxlag >= xl or maxlag < 1:
-        raise ValueError('maglags must be None or strictly positive')
+        raise ValueError("maglags must be None or strictly positive")
 
     if xl > 500:  # Rough estimate of speed crossover
         c = sig.fftconvolve(x, y[::-1])
-        c = c[xl - 1 - maxlag:xl + maxlag]
+        c = c[xl - 1 - maxlag : xl + maxlag]
     else:
-        c = np.zeros(2*maxlag + 1)
-        for i in range(maxlag+1):
-            c[maxlag-i] = np.correlate(x[0:min(xl, yl-i)],
-                                       y[i:i+min(xl, yl-i)])
-            c[maxlag+i] = np.correlate(x[i:i+min(xl-i, yl)],
-                                       y[0:min(xl-i, yl)])
+        c = np.zeros(2 * maxlag + 1)
+        for i in range(maxlag + 1):
+            c[maxlag - i] = np.correlate(
+                x[0 : min(xl, yl - i)], y[i : i + min(xl, yl - i)]
+            )
+            c[maxlag + i] = np.correlate(
+                x[i : i + min(xl - i, yl)], y[0 : min(xl - i, yl)]
+            )
     return c
 
 
@@ -124,43 +121,43 @@ def block_levinson(y, L):
     ----------
         Akaike, Hirotugu (1973). "Block Toeplitz Matrix Inversion".  SIAM J.
         Appl. Math. 24 (2): 234-241
-   """
-    d = L.shape[1]               # Block dimension
-    N = int(L.shape[0]/d)        # Number of blocks
+    """
+    d = L.shape[1]  # Block dimension
+    N = int(L.shape[0] / d)  # Number of blocks
 
     # This gets the bottom block row B from the left block column L
-    B = np.reshape(L, [d, N, d], order='F')
+    B = np.reshape(L, [d, N, d], order="F")
     B = B.swapaxes(1, 2)
     B = B[..., ::-1]
-    B = np.reshape(B, [d, N*d], order='F')
+    B = np.reshape(B, [d, N * d], order="F")
 
     f = np.linalg.inv(L[:d, :])  # "Forward" vector
-    b = f                        # "Backward" vector
-    x = np.dot(f, y[:d])         # Solution vector
+    b = f  # "Backward" vector
+    x = np.dot(f, y[:d])  # Solution vector
 
-    Ai = np.eye(2*d)
-    G = np.zeros((d*N, 2*d))
-    for n in range(2, N+1):
-        ef = np.dot(B[:, (N-n)*d:N*d], np.vstack((f, np.zeros((d, d)))))
-        eb = np.dot(L[:n*d, :].T, np.vstack((np.zeros((d, d)), b)))
-        ex = np.dot(B[:, (N-n)*d:N*d], np.vstack((x, np.zeros((d, 1)))))
+    Ai = np.eye(2 * d)
+    G = np.zeros((d * N, 2 * d))
+    for n in range(2, N + 1):
+        ef = np.dot(B[:, (N - n) * d : N * d], np.vstack((f, np.zeros((d, d)))))
+        eb = np.dot(L[: n * d, :].T, np.vstack((np.zeros((d, d)), b)))
+        ex = np.dot(B[:, (N - n) * d : N * d], np.vstack((x, np.zeros((d, 1)))))
         Ai[:d, d:] = eb
         Ai[d:, :d] = ef
         A = np.linalg.inv(Ai)
-        l = d*(n-1)
-        G[:l, :d] = f
-        G[d:l+d, d:] = b
-        fn = np.dot(G[:l+d, :], A[:, :d])
-        bn = np.dot(G[:l+d, :], A[:, d:])
+        ll = d * (n - 1)
+        G[:ll, :d] = f
+        G[d : ll + d, d:] = b
+        fn = np.dot(G[: ll + d, :], A[:, :d])
+        bn = np.dot(G[: ll + d, :], A[:, d:])
         f = fn
         b = bn
-        x = np.vstack((x, np.zeros((d, 1)))) + np.dot(b, y[(n-1)*d:n*d]-ex)
+        x = np.vstack((x, np.zeros((d, 1)))) + np.dot(b, y[(n - 1) * d : n * d] - ex)
 
     W = x
     return W
 
 
-def wiener_fir(tar, wit, N=8, method='brute'):
+def wiener_fir(tar, wit, N=8, method="brute"):
     """
     Calculate the optimal FIR Wiener subtraction filter for multiple inputs.
 
@@ -192,77 +189,74 @@ def wiener_fir(tar, wit, N=8, method='brute'):
     """
 
     method = method.lower()
-    if method not in ['levinson', 'brute']:
-        raise ValueError('Unknown method type')
+    if method not in ["levinson", "brute"]:
+        raise ValueError("Unknown method type")
 
     N = int(N)
     if isinstance(wit, np.ndarray):
         if len(wit.shape) == 1:
-            wit = np.reshape(wit, (1, wit.size), order='A')
+            wit = np.reshape(wit, (1, wit.size), order="A")
         M = wit.shape[0]
     elif isinstance(wit, list):
         M = len(wit)
         wit = np.vstack([w for w in wit])
 
-    P = np.zeros(M*(N+1))
+    P = np.zeros(M * (N + 1))
     # Cross correlation
     for m in range(M):
-        top = m * (N+1)
-        bottom = (m+1) * (N+1)
+        top = m * (N + 1)
+        bottom = (m + 1) * (N + 1)
         p = xcorr(tar, wit[m, :], N)
-        P[top:bottom] = p[N:2*N+1]
+        P[top:bottom] = p[N : 2 * N + 1]
 
-    if method.lower() == 'levinson':
-        P = np.reshape(P, [N+1, M], order='F')
-        P = np.reshape(P.T, [M*(N+1), 1], order='F')
-        R = np.zeros((M*(N+1), M))
+    if method.lower() == "levinson":
+        P = np.reshape(P, [N + 1, M], order="F")
+        P = np.reshape(P.T, [M * (N + 1), 1], order="F")
+        R = np.zeros((M * (N + 1), M))
         for m in range(M):
-            for ii in range(m+1):
+            for ii in range(m + 1):
                 rmi = xcorr(wit[m, :], wit[ii, :], N)
-                Rmi = np.flipud(rmi[:N+1])
-                top = m * (N+1)
-                bottom = (m+1) * (N+1)
+                Rmi = np.flipud(rmi[: N + 1])
+                top = m * (N + 1)
+                bottom = (m + 1) * (N + 1)
                 R[top:bottom, ii] = Rmi
                 if ii != m:
                     Rmi = rmi[N:]
-                    top = ii * (N+1)
-                    bottom = (ii+1) * (N+1)
+                    top = ii * (N + 1)
+                    bottom = (ii + 1) * (N + 1)
                     R[top:bottom, m] = Rmi
 
-        R = np.reshape(R, [N+1, M, M], order='F')
+        R = np.reshape(R, [N + 1, M, M], order="F")
         R = R.swapaxes(0, 1)
-        R = np.reshape(R, [M*(N+1), M], order='F')
+        R = np.reshape(R, [M * (N + 1), M], order="F")
 
         W = block_levinson(P, R)
 
         #  Return each witness' filter as a row
-        W = np.reshape(W, [M, N+1], order='F')
+        W = np.reshape(W, [M, N + 1], order="F")
 
-    elif method.lower() == 'brute':
-        R = np.zeros((M*(N+1), M*(N+1)))
+    elif method.lower() == "brute":
+        R = np.zeros((M * (N + 1), M * (N + 1)))
         for m in range(M):
             for ii in range(m, M):
                 rmi = xcorr(wit[m, :], wit[ii, :], N)
-                Rmi = sl.toeplitz(np.flipud(rmi[:N+1]), rmi[N:2*N+1])
-                top = m * (N+1)
-                bottom = (m+1) * (N+1)
-                left = ii * (N+1)
-                right = (ii+1) * (N+1)
+                Rmi = sl.toeplitz(np.flipud(rmi[: N + 1]), rmi[N : 2 * N + 1])
+                top = m * (N + 1)
+                bottom = (m + 1) * (N + 1)
+                left = ii * (N + 1)
+                right = (ii + 1) * (N + 1)
                 R[top:bottom, left:right] = Rmi
                 if ii != m:
                     R[left:right, top:bottom] = Rmi.T
         W = np.linalg.solve(R, P)
 
         #  Return each witness' filter as a row
-        W = np.reshape(W, [M, N+1])
+        W = np.reshape(W, [M, N + 1])
 
     return W
 
 
-def stream_data(start, channels,
-                dur  = 600,
-                fsup = 512,
-                ifo  = 'H1'):
+def stream_data(start, channels, dur=600, fsup=512, ifo="H1"):
     """
     Collect LIGO data using nds2
 
@@ -285,11 +279,10 @@ def stream_data(start, channels,
         array of collected data
     """
 
-    import nds2
-    if ifo == 'H1':
-        server = 'nds.ligo-wa.caltech.edu'
+    if ifo == "H1":
+        server = "nds.ligo-wa.caltech.edu"
     else:
-        server = 'nds.ligo-la.caltech.edu'
+        server = "nds.ligo-la.caltech.edu"
 
     # Setup connection to the NDS
     conn = nds2.connection(server, 31200)
@@ -304,13 +297,17 @@ def stream_data(start, channels,
         fsdown = data[k][0].channel.sample_rate
         down_factor = int(fsdown // fsup)
 
-        fir_aa = sig.firwin(20 * down_factor + 1, 0.8 / down_factor,
-                            window='blackmanharris')
+        fir_aa = sig.firwin(
+            20 * down_factor + 1, 0.8 / down_factor, window="blackmanharris"
+        )
 
         # Using fir_aa[1:-1] cuts off a leading and trailing zero
-        downdata = sig.decimate(data[k][0].data, down_factor,
-                                ftype = sig.dlti(fir_aa[1:-1], 1.0),
-                                zero_phase = True)
+        downdata = sig.decimate(
+            data[k][0].data,
+            down_factor,
+            ftype=sig.dlti(fir_aa[1:-1], 1.0),
+            zero_phase=True,
+        )
         vdata.append(downdata)
 
     return np.array(vdata)
@@ -331,7 +328,7 @@ def cross_corr(x, y, M=32):
     """
     xl = x.size
     xc = sig.fftconvolve(x, y[::-1])
-    xc = xc[xl - 1 - M: xl + M]
+    xc = xc[xl - 1 - M : xl + M]
     return xc
 
 
@@ -362,21 +359,21 @@ def extended_wf(tar, wits, M):
     combos = itertools.product(np.arange(chans), np.arange(chans))
 
     # cross correlation vector
-    P = np.zeros((M+1) * chans)
+    P = np.zeros((M + 1) * chans)
     for ii in range(chans):
         p = cross_corr(tar, wits[ii, :], M)
-        P[ii*(M+1):(ii+1)*(M+1)] = p[M:2*M+1]
+        P[ii * (M + 1) : (ii + 1) * (M + 1)] = p[M : 2 * M + 1]
 
     # correlation matrix
-    R = np.zeros(((M+1)*chans, (M+1)*chans))
+    R = np.zeros(((M + 1) * chans, (M + 1) * chans))
     for combo in combos:
         a, b = combo
         corr = cross_corr(wits[a, :], wits[b, :], M)
-        toep = sl.toeplitz(np.flipud(corr[:(M+1)]), corr[M:2*M+1])
-        R[a*(M+1):(a+1)*(M+1), b*(M+1):(b+1)*(M+1)] = toep
+        toep = sl.toeplitz(np.flipud(corr[: (M + 1)]), corr[M : 2 * M + 1])
+        R[a * (M + 1) : (a + 1) * (M + 1), b * (M + 1) : (b + 1) * (M + 1)] = toep
 
     W = np.linalg.solve(R, P)
-    W = np.reshape(W, [chans, (M+1)])
+    W = np.reshape(W, [chans, (M + 1)])
     return W
 
 
@@ -401,20 +398,20 @@ def miso_wiener_fir(tar, wits, M):
     chans = wits.shape[0]
 
     # cross correlation vector
-    P = np.zeros((M+1) * chans)
+    P = np.zeros((M + 1) * chans)
     for ii in range(chans):
         p = cross_corr(tar, wits[ii, :], M)
-        P[ii*(M+1):(ii+1)*(M+1)] = p[M:2*M+1]
+        P[ii * (M + 1) : (ii + 1) * (M + 1)] = p[M : 2 * M + 1]
 
     # correlation matrix
-    R = np.zeros(((M+1)*chans, (M+1)*chans))
+    R = np.zeros(((M + 1) * chans, (M + 1) * chans))
     for ii in range(chans):
         corr = cross_corr(wits[ii, :], wits[ii, :], M)
-        toep = sl.toeplitz(np.flipud(corr[:(M+1)]), corr[M:2*M+1])
-        R[ii*(M+1):(ii+1)*(M+1), ii*(M+1):(ii+1)*(M+1)] = toep
+        toep = sl.toeplitz(np.flipud(corr[: (M + 1)]), corr[M : 2 * M + 1])
+        R[ii * (M + 1) : (ii + 1) * (M + 1), ii * (M + 1) : (ii + 1) * (M + 1)] = toep
 
     W = np.linalg.solve(R, P)
-    W = np.reshape(W, [chans, (M+1)])
+    W = np.reshape(W, [chans, (M + 1)])
     return W
 
 
@@ -438,11 +435,11 @@ def siso_wiener_fir(tar, wit, M=8):
     """
     # Cross correlation
     p = cross_corr(tar, wit, M)
-    P = p[M:2*M+1]
+    P = p[M : 2 * M + 1]
 
     # correlation matrix
     rmi = cross_corr(wit, wit, M)
-    R = sl.toeplitz(np.flipud(rmi[:M+1]), rmi[M:2*M+1])
+    R = sl.toeplitz(np.flipud(rmi[: M + 1]), rmi[M : 2 * M + 1])
 
     # solve and return
     W = np.linalg.solve(R, P)
@@ -470,14 +467,14 @@ def rls(d, x, M=4, L=0.90):
     y : `numpy.ndarray`
         bilinear noise estimate
     """
-    inv_L = 1/L
-    w = np.random.rand(M+1)
-    P = np.eye(M+1)*0.01
+    inv_L = 1 / L
+    w = np.random.rand(M + 1)
+    P = np.eye(M + 1) * 0.01
     y = np.zeros_like(d)
     e = np.zeros_like(d)
 
-    for k in range(M+1, d.size):
-        xx = x[k-(M+1):k]
+    for k in range(M + 1, d.size):
+        xx = x[k - (M + 1) : k]
         y[k] = np.dot(w, xx)
         e[k] = d[k] - y[k]
         r = inv_L * np.dot(P, xx)
@@ -521,28 +518,28 @@ def nlms(d, x, M=1, mu=0.01, psi=0, leak=0):
 
     for ii in range(x.shape[0]):
         # initialize
-        w = np.random.rand(M+1)
+        w = np.random.rand(M + 1)
         e = np.zeros_like(d)
         y = np.zeros_like(d)
         xf = x[ii, :]
 
-        if mu == None:
+        if mu is None:
             eig = np.max(np.dot(xf, xf))
             mu = 1 / (4 * eig)
 
         # run the filter
-        for k in range(M+1, d.size):
-            xx = xf[k-(M+1):k]
+        for k in range(M + 1, d.size):
+            xx = xf[k - (M + 1) : k]
             y[k] = np.dot(w, xx)
             e[k] = d[k] - y[k]
-            w = w*(1-leak) + mu*e[k]*xx/(psi+np.dot(xx,xx))
+            w = w * (1 - leak) + mu * e[k] * xx / (psi + np.dot(xx, xx))
 
         estimate += y
 
     return estimate
 
 
-def soaf(d, x, M=1, mu=0.01, beta = 0.01):
+def soaf(d, x, M=1, mu=0.01, beta=0.01):
     """
     Self-orthogonalizing adaptive filter. Essentially,
     this is an LMS filter where the input signal is
@@ -568,18 +565,18 @@ def soaf(d, x, M=1, mu=0.01, beta = 0.01):
     """
     y = np.zeros_like(d)
     e = np.zeros_like(d)
-    w = np.random.rand(M+1)
+    w = np.random.rand(M + 1)
 
-    for k in range(M+1, d.size):
-        xx = x[k-(M+1):k]
+    for k in range(M + 1, d.size):
+        xx = x[k - (M + 1) : k]
         u = sc.dct(xx)
-        if k == M+1:
+        if k == M + 1:
             power = np.dot(u, u)
         y[k] = np.dot(w, u)
-        power = (1-beta)*power + beta * np.dot(u, u)
-        inv_sqrt_power = 1/(np.sqrt(power + 1e-5))
+        power = (1 - beta) * power + beta * np.dot(u, u)
+        inv_sqrt_power = 1 / (np.sqrt(power + 1e-5))
         e[k] = d[k] - y[k]
-        w = w + mu*e[k]*inv_sqrt_power * u
+        w = w + mu * e[k] * inv_sqrt_power * u
 
     return y
 
@@ -609,18 +606,18 @@ def nlms_2nd_order(d, x1, x2, M=1, mu=1e-3):
         bilinear noise estimate
     """
     # initialize
-    w = np.random.rand(M+1, M+1)
+    w = np.random.rand(M + 1, M + 1)
     e = np.zeros_like(d)
     y = np.zeros_like(d)
 
-    if mu == None:
+    if mu is None:
         eig = np.max([np.dot(x1, x1), np.dot(x2, x2)])
         mu = 1 / (4 * eig)
 
     # run the filter
-    for k in range(M+1, d.size):
-        xx1 = x1[k-(M+1):k]
-        xx2 = x2[k-(M+1):k]
+    for k in range(M + 1, d.size):
+        xx1 = x1[k - (M + 1) : k]
+        xx2 = x2[k - (M + 1) : k]
         y[k] = np.dot(xx1, np.dot(w, xx2))
         e[k] = d[k] - y[k]
         w = w + 2 * mu * e[k] * np.outer(xx1, xx2)
@@ -652,17 +649,19 @@ def nonlinear_AF(d, x1, x2, M=1, mu=1e-4):
         bilinear noise estimate
     """
     # initialize
-    w = np.random.rand((M+1)**2)
+    w = np.random.rand((M + 1) ** 2)
     e = np.zeros_like(d)
     y = np.zeros_like(d)
 
-    if mu == None:
+    if mu is None:
         eig = np.max([np.dot(x1, x1), np.dot(x2, x2)])
         mu = 1 / (4 * eig)
 
     # run the filter
-    for k in range(M+1, d.size):
-        x = np.flipud(np.matrix.flatten(np.outer(x1[k-(M+1):k], x2[k-(M+1):k]).T))
+    for k in range(M + 1, d.size):
+        x = np.flipud(
+            np.matrix.flatten(np.outer(x1[k - (M + 1) : k], x2[k - (M + 1) : k]).T)
+        )
         y[k] = np.dot(w, x)
         e[k] = d[k] - y[k]
         w = w + 2 * mu * e[k] * x
@@ -693,18 +692,18 @@ def whiten(data, fid_dat, time=60, fs=512):
     """
 
     # get the data we want (dat)
-    dat = data[:fid_dat.size]
+    dat = data[: fid_dat.size]
 
     # get the FFT and PSD (offset the windows so we can dewhiten later)
     win = np.hanning(len(dat))
     win[0] += 1e-6
     win[-1] += 1e-6
     wf = np.mean(win**2)
-    dfft = np.fft.rfft(dat*win) / np.sqrt(wf)
+    dfft = np.fft.rfft(dat * win) / np.sqrt(wf)
     _, dpsd = sig.welch(fid_dat, fs=fs, nperseg=len(fid_dat))
 
     # whiten FFT with the ASD and normalize by 1/fs
-    norm = 1/(fs)
+    norm = 1 / (fs)
     whitened = norm * (dfft / np.sqrt(dpsd))
     white_dat = np.fft.irfft(whitened, n=len(dat))
 
@@ -736,7 +735,7 @@ def dewhiten(white_dat, fid_dat, time, fs):
     n = time * fs
     whitened = np.fft.rfft(white_dat, n=n)
 
-    norm = 1/fs
+    norm = 1 / fs
     _, dpsd = sig.welch(fid_dat, fs=fs, nperseg=len(fid_dat))
     dfft = whitened * np.sqrt(dpsd) / norm
 
@@ -757,12 +756,12 @@ def whiten_zpk(signal, fs, flow=0.3, fhigh=30, order=6):
     else:
         axis = -1
 
-    zc = [-2*np.pi*flow]*(order//2)
-    pc = [-2*np.pi*fhigh]*(order//2)
+    zc = [-2 * np.pi * flow] * (order // 2)
+    pc = [-2 * np.pi * fhigh] * (order // 2)
     kc = 1.0
 
     sysc = sig.ZerosPolesGain(zc, pc, kc)
-    sysd = sysc.to_discrete(dt=1/float(fs), method='bilinear')
+    sysd = sysc.to_discrete(dt=1 / float(fs), method="bilinear")
 
     sosW = sig.zpk2sos(sysd.zeros, sysd.poles, sysd.gain)
     signal = sig.sosfiltfilt(sosW, signal, axis=axis)
@@ -777,60 +776,42 @@ def apply_weights_1d(wit, a):
     """
     wsize = wit.size
     asize = a.size
-    a = np.pad(a[::-1], (0, wsize-1), constant_values=0)
-    wit = np.pad(wit, (asize-1, 0), constant_values=0)
+    a = np.pad(a[::-1], (0, wsize - 1), constant_values=0)
+    wit = np.pad(wit, (asize - 1, 0), constant_values=0)
     out = np.zeros(wsize)
     for ii in range(out.size):
         out[ii] = wit.dot(np.roll(a, ii))
     return out
 
 
-def apply_weights_2d(wit1, wit2, a):
-    """
-    Convolve 2d filter coefficients and the
-    input witness channels.
-    """
-    M = a.shape[0] - 1
-
-    wit1 = np.pad(wit1, (M, 0), constant_values=0)
-    wit2 = np.pad(wit2, (M, 0), constant_values=0)
-
-    y = np.zeros(wit1.size-M)
-    for ii in range(wit1.size-M):
-        wit_mat = np.outer(wit1[ii:ii + (M+1)][::-1], wit2[ii:ii+(M+1)][::-1])
-        y[ii] = np.tensordot(wit_mat, a)
-
-    return y
-
-
-def correlation(a,b,M):
+def correlation(a, b, M):
     """
     Same an np.correlate(a,b) or cross_corr(a,b,M)
     """
     a = np.pad(a, M, constant_values=0)
-    b = np.pad(b, (0, 2*M), constant_values=0)
-    out = np.zeros(2*M+1)
-    for ii in range(2*M+1):
-        out[ii] = a.dot(np.roll(b,ii))
+    b = np.pad(b, (0, 2 * M), constant_values=0)
+    out = np.zeros(2 * M + 1)
+    for ii in range(2 * M + 1):
+        out[ii] = a.dot(np.roll(b, ii))
     return out
 
 
 def two_point_correlation(a, b, M):
 
     if a.size != b.size:
-        sys.exit('Array sizes do not match!')
+        sys.exit("Array sizes do not match!")
 
     # pad and stack (makes rolling cleaner)
-    a = np.pad(a, (M,M))
-    b = np.pad(b, (M,M))
+    a = np.pad(a, (M, M))
+    b = np.pad(b, (M, M))
 
     # fill the correlation matrix
-    out = np.zeros((2*M+1,2*M+1))
-    for mp in range(-M,M+1):
-        for m in range(-M,M+1):
+    out = np.zeros((2 * M + 1, 2 * M + 1))
+    for mp in range(-M, M + 1):
+        for m in range(-M, M + 1):
             out[m, mp] = np.sum(np.roll(a, m) * np.roll(b, mp))
 
-    out = out[:M+1, :M+1]
+    out = out[: M + 1, : M + 1]
     return out
 
 
@@ -860,9 +841,9 @@ def apply_weights_2d(wit1, wit2, coeffs):
     wit1 = np.pad(wit1, (M, 0), constant_values=0)
     wit2 = np.pad(wit2, (M, 0), constant_values=0)
 
-    y = np.zeros(wit1.size-M)
-    for ii in range(wit1.size-M):
-        wit_mat = np.outer(wit1[ii:ii+(M+1)][::-1], wit2[ii:ii+(M+1)][::-1])
+    y = np.zeros(wit1.size - M)
+    for ii in range(wit1.size - M):
+        wit_mat = np.outer(wit1[ii : ii + (M + 1)][::-1], wit2[ii : ii + (M + 1)][::-1])
         y[ii] = np.tensordot(wit_mat, coeffs)
 
     return y
@@ -890,7 +871,7 @@ def align_phase(tar, est, shift=2):
     """
 
     phase_shift = 0
-    for s in np.linspace(-shift, shift, shift*2 + 1, dtype=int):
+    for s in np.linspace(-shift, shift, shift * 2 + 1, dtype=int):
         if s > 0:
             s_mse = np.sum(np.square(tar[s:] - est[:-s])) / len(tar[s:])
         if s < 0:
@@ -948,7 +929,7 @@ def adaptive_filter(data, mu=0.1, M=3, c_ops=None, shift=2, doShift=False):
 
     # filter one channel at a time (output is (pseudo)linear & nonstationary)
     for chan in range(wits.shape[0]):
-        if c_ops != None:
+        if c_ops is not None:
             mu, M = c_ops[chan + 1]
         xx = np.zeros(M)
 
@@ -957,7 +938,7 @@ def adaptive_filter(data, mu=0.1, M=3, c_ops=None, shift=2, doShift=False):
 
         # run the M-tap filter
         for k in range(M, N):
-            xx = wits[chan, k-M:k]
+            xx = wits[chan, k - M : k]
             est[chan, k] = np.dot(w, xx)
             e[chan, k] = tar[k] - est[chan, k]
             w = w + 2 * mu * e[chan, k] * xx
@@ -974,7 +955,7 @@ def adaptive_filter(data, mu=0.1, M=3, c_ops=None, shift=2, doShift=False):
     return combined_est
 
 
-def find_optimal_params(system_data, mu=[], M=[]):
+def find_optimal_params(system_data, mu=[], M=[], fs=128):
     """
     grid search to get the optimal number of taps and
     learning rate (using the adaptive_filter() function)
@@ -997,9 +978,8 @@ def find_optimal_params(system_data, mu=[], M=[]):
 
     """
     mse = np.inf
-    d = system_data[0, :]
     opt_mu, opt_M = 0.001, 3
-    _, df = sig.welch(system_data[0, :], fs=fs, nperseg=4*fs)
+    _, df = sig.welch(system_data[0, :], fs=fs, nperseg=4 * fs)
     c_ops = {}
 
     for c in range(1, system_data.shape[0]):
@@ -1007,8 +987,8 @@ def find_optimal_params(system_data, mu=[], M=[]):
         for test_mu in mu:
             for test_M in M:
                 ce = adaptive_filter(data, mu=test_mu, M=test_M)
-                _, fres = sig.welch(data[0, :]-ce, fs=fs, nperseg=4*fs)
-                loop_res = np.sum(fres/df)
+                _, fres = sig.welch(data[0, :] - ce, fs=fs, nperseg=4 * fs)
+                loop_res = np.sum(fres / df)
                 if loop_res < mse:
                     opt_mu, opt_M = test_mu, test_M
                     mse = loop_res
@@ -1033,7 +1013,7 @@ def read_chans(chan_file):
     """
     with open(chan_file) as f:
         lines = f.readlines()
-    chans = [x.strip('\n') for x in lines]
+    chans = [x.strip("\n") for x in lines]
     return chans
 
 
@@ -1061,19 +1041,19 @@ def prepare_multi_wit(*pargs, M=1, lstm=False):
         output data array with M-taps of lookback
     """
     if M == 0:
-        print('WARNING: tried to set 0-dimensional channel')
-        print('Reverting to M=1')
+        print("WARNING: tried to set 0-dimensional channel")
+        print("Reverting to M=1")
         M = 1
 
     if M >= pargs[0].shape[1]:
-        print('WARNING: desired channel taps exceeds witness size')
-        print('Falling back to M={}'.format(pargs[0].shape[1] - 1))
+        print("WARNING: desired channel taps exceeds witness size")
+        print("Falling back to M={}".format(pargs[0].shape[1] - 1))
         M = pargs[0].shape[1] - 1
 
     wit_input = np.vstack((pargs))
     output = np.zeros((wit_input.shape[1] - (M - 1), M, wit_input.shape[0]))
     for r in range(output.shape[0]):
-        output[r, :, :] = wit_input[:, r:r+M].T
+        output[r, :, :] = wit_input[:, r : r + M].T
 
     # flatten for dense network
     if not lstm:
@@ -1148,24 +1128,25 @@ def four_point_corr(a, b, c, d, M):
     """
 
     if a.size != b.size or b.size != c.size or c.size != d.size:
-        sys.exit('Array sizes do not match!')
+        sys.exit("Array sizes do not match!")
 
     # pad and stack (makes rolling cleaner)
-    a = np.pad(a, (M,M))
-    b = np.pad(b, (M,M))
-    c = np.pad(c, (M,M))
-    d = np.pad(d, (M,M))
+    a = np.pad(a, (M, M))
+    b = np.pad(b, (M, M))
+    c = np.pad(c, (M, M))
+    d = np.pad(d, (M, M))
 
     # fill the correlation matrix
-    out = np.zeros((2*M+1,2*M+1, 2*M+1, 2*M+1))
-    for j in range(-M,M+1):
-        for i in range(-M,M+1):
-            for mp in range(-M,M+1):
-                for m in range(-M,M+1):
-                    out[m, mp, i, j] = np.sum(np.roll(a, m) * np.roll(b, mp)\
-                            * np.roll(c, i) * np.roll(d, j))
+    out = np.zeros((2 * M + 1, 2 * M + 1, 2 * M + 1, 2 * M + 1))
+    for j in range(-M, M + 1):
+        for i in range(-M, M + 1):
+            for mp in range(-M, M + 1):
+                for m in range(-M, M + 1):
+                    out[m, mp, i, j] = np.sum(
+                        np.roll(a, m) * np.roll(b, mp) * np.roll(c, i) * np.roll(d, j)
+                    )
 
-    out = out[:M+1, :M+1, :M+1, :M+1]
+    out = out[: M + 1, : M + 1, : M + 1, : M + 1]
     return out
 
 
@@ -1199,21 +1180,20 @@ def three_point_static_corr(a, b, c, M):
     """
 
     if a.size != b.size or b.size != c.size:
-        sys.exit('Array sizes do not match!')
+        sys.exit("Array sizes do not match!")
 
     # pad and stack (makes rolling cleaner)
-    a = np.pad(a, (M,M))
-    b = np.pad(b, (M,M))
-    c = np.pad(c, (M,M))
+    a = np.pad(a, (M, M))
+    b = np.pad(b, (M, M))
+    c = np.pad(c, (M, M))
 
     # fill the correlation matrix
-    out = np.zeros((2*M+1, 2*M+1))
-    for i in range(-M,M+1):
-        for mp in range(-M,M+1):
-            out[mp, i] = np.sum(a * np.roll(b, mp)\
-                    * np.roll(c, i))
+    out = np.zeros((2 * M + 1, 2 * M + 1))
+    for i in range(-M, M + 1):
+        for mp in range(-M, M + 1):
+            out[mp, i] = np.sum(a * np.roll(b, mp) * np.roll(c, i))
 
-    out = out[:M+1, :M+1].flatten()
+    out = out[: M + 1, : M + 1].flatten()
     return out
 
 
@@ -1243,8 +1223,8 @@ def volterra_pipeline(d, wit1, wit2, M):
     """
     P = three_point_static_corr(d, wit1, wit2, M=M)
     out = four_point_corr(wit1, wit2, wit1, wit2, M)
-    vc = out.reshape(((M+1)**2, (M+1)**2)).T
+    vc = out.reshape(((M + 1) ** 2, (M + 1) ** 2)).T
     weights = np.linalg.pinv(vc).dot(P)
-    est = apply_weights_2d(wit1, wit2, weights.reshape(((M+1), (M+1))))
+    est = apply_weights_2d(wit1, wit2, weights.reshape(((M + 1), (M + 1))))
     clean = d - est
     return clean
